@@ -249,9 +249,9 @@ data in a lower-level cache may be present in a higher-level cache.
 Parallelism can be achieved at the software level through processes and
 threads. A \textbf{process} is an instance of a program being executed
 by the operating system that has its own memory space and threads of
-execution. Upon initialisation, a process creates a \textbf{thread} that
-executes its main function. This main thread can then spawn additional
-threads that execute independent streams of instructions.
+execution. Upon initialisation, a process creates a \textbf{thread}
+that executes its main function. This main thread can then spawn
+additional threads that execute independent streams of instructions.
 
 A \textbf{thread} is a lightweight process that has its own program
 counter and local memory called the \textbf{stack}. The lifetime of the
@@ -273,11 +273,254 @@ with multiple cores. Note that for a CPU with N cores, a process with N
 threads may not always be granted all N cores, as the operating system
 may allocate some cores to other processes.
 \subsection{Simultaneous Multi-Threading}
-To reduce the overhead incurred during a context switch, some processors
-allow more than one thread to be executed on a single core at the same
-time by interleaving instructions from multiple threads. This is known
-as \textbf{Simultaneous Multi-Threading (SMT)} or \textbf{Hyper-Threading}.
-In these processors, each core has multiple sets of registers and
-program counters (typically two) for each thread, with a shared set of
-functional units, that allow multiple threads to be executed in parallel.
+To reduce the overhead incurred during a context switch, some
+processors allow more than one thread to be executed on a single core
+at the same time by interleaving instructions from multiple threads.
+This is known as \textbf{Simultaneous Multi-Threading (SMT)} or
+\textbf{Hyper-Threading}. In these processors, each core has multiple
+sets of registers and program counters (typically two) for each thread,
+with a shared set of functional units, that allow multiple threads to
+be executed in parallel.
+\section{Parallelisation}
+\subsection{Forms of Parallelism}
+Parallelism can be achieved at multiple levels:
+\begin{itemize}
+    \item \textbf{Instruction Level Parallelism (ILP)}: Parallelism
+          achieved by executing multiple instructions in parallel.
+    \item \textbf{Vector Parallelism}: Parallelism achieved by
+          executing the same instruction on multiple data elements
+          simultaneously. This is typically done using \textbf{SIMD}
+          (Single Instruction, Multiple Data) instructions.
+    \item \textbf{Thread Level Parallelism (TLP)}: Parallelism achieved
+          by executing multiple threads in parallel. This can be done
+          using multiple cores, or by interleaving instructions from
+          multiple threads on a single core.
+    \item \textbf{Process Level Parallelism}: Parallelism achieved
+          by executing multiple processes in parallel. Processes can
+          communicate with each other through inter-process
+          communication. Threads within the same process communicate via
+          shared memory, while processes on different machines
+          communicate via message passing. Distributed shared memory
+          systems provide a shared memory programming model for
+          distributed memory systems.
+\end{itemize}
+\subsection{Types of Parallel Computers}
+\subsubsection{Flynn's Taxonomy}
+Flynn's Taxonomy classifies parallel computers based on the number of
+instruction streams and data streams that can be processed at the same
+time. It has four categories:
+\begin{itemize}
+    \item \textbf{Single Instruction, Single Data (SISD)}: A single
+          instruction stream is executed on a single data stream. This
+          is the traditional von Neumann architecture.
+    \item \textbf{Single Instruction, Multiple Data (SIMD)}: A single
+          instruction stream is executed on multiple data streams
+          (includes superscalar processors). This is typically done
+          using vector processors or GPUs.
+    \item \textbf{Multiple Instruction, Single Data (MISD)}: Multiple
+          instruction streams are executed on a single data stream.
+          Commonly used in fault-tolerant redundant systems.
+    \item \textbf{Multiple Instruction, Multiple Data (MIMD)}: Multiple
+          instruction streams are executed on multiple data streams.
+          This is the most common form of parallelism, and is used in
+          multi-core CPUs and distributed systems, including both
+          shared memory and distributed memory systems.
+\end{itemize}
+\subsection{Types of Supercomputers}
+\begin{itemize}
+    \item \textbf{Vector Processors}: Processors that can execute
+          vector instructions on multiple data elements in parallel.
+          This includes early supercomputers like the Cray-1.
+    \item \textbf{Symmetric Multi-Processor (SMP)}: Multi-core
+          processors that share memory and have equal access to all
+          resources.
+    \item \textbf{Massively Parallel Processors (MPP)}: Tightly coupled
+          systems with multiple processors that communicate with each
+          other via proprietary high-speed interconnect.
+    \item \textbf{Clusters}: Loosely coupled distributed memory systems
+          that consist of commodity nodes.
+    \item \textbf{Asymmetric Multi-Processor (AMP)}: Specialised
+          co-processors that offload specific tasks from the main CPU (i.e., GPUs).
+    \item \textbf{Hybrid Systems}: Systems that combine multiple
+          architectures to take advantage of the strengths of each
+          architecture.
+    \item \textbf{Cycle Stealing Systems}: Systems that use idle
+          resources on a network of computers to perform computations.
+\end{itemize}
+\subsection{Parallel Computing Models}
+\subsubsection{Concurrent Computing}
+A concurrent computing model is one where multiple operation streams
+progress independently. This does not require multiple processors nor
+does it imply simultaneous execution. Such models may be prone to
+problems such as deadlocks.
+\subsubsection{Parallel Computing}
+A parallel computing model is one where multiple operation streams
+progress simultaneously. This requires multiple processors and
+simultaneous execution.
+\subsubsection{Distributed Computing}
+A distributed computing model is one where multiple operation streams
+progress simultaneously on different machines. This includes parallel
+computing clusters and distributed concurrent systems.
+\subsection{Parallelisation}
+Parallelisation is the process of converting a sequential program into
+a parallel program, that can run on parallel hardware. Doing this
+effectively requires programmers to use a fundamentally different
+algorithm than the one used on sequential hardware, that is expressed
+in a manner that makes parallelisation more explicit or easier.
+
+In some cases, we can exploit parallelism without changing the
+algorithm, by analysing which computational steps performed in the
+algorithm can be executed in parallel. This is known as exploiting
+\textbf{inherent parallelism}.
+\subsubsection{Parallelisation in Functional and Imperative Programming}
+\begin{itemize}
+    \item \textbf{Functional Programming}: Pure functional programming
+          languages express computation via function evaluation. As
+          function evaluation does not produce side effects, functions
+          that do not depend on the result of another can be executed in
+          parallel.
+    \item \textbf{Imperative Programming}: Imperative programming
+          languages express computation via a sequence of statements.
+          Parallelisation in imperative programming is more difficult
+          as statements may have side effects that depend on the order
+          of execution.
+\end{itemize}
+\subsubsection{Safe Parallelisation}
+The process of parallelisation must be done in a manner that ensures
+the same result is produced as the sequential program. Two dependencies
+must be preserved to ensure safe parallelisation:
+\begin{itemize}
+    \item Control dependencies
+    \item Data dependencies
+\end{itemize}
+\subsubsection{Control Dependences}
+A control dependency is a dependency where one statement depends on
+whether another statement is executed. Some examples of control
+dependencies are shown below:
+\begin{minted}{c}
+int gcd(int a, int b) {
+    // if statement
+    if (b == 0) {
+        return a;             // Control dependency
+    } else {
+        return gcd(b, a % b); // Control dependency
+    }
+}
+
+int gcd(int a, int b) {
+    // while loop
+    while (b != 0) {
+        int temp = b; // Control dependency
+        b = a % b;    // Control dependency
+        a = temp;     // Control dependency
+    }
+    return a;
+}
+
+int gcd(int a, int b) {
+    // error handling
+    if (a < 0 || b < 0) {
+        return -1;
+    }
+
+    ... // Control dependency
+}
+\end{minted}
+Control dependencies can be difficult to determine when the program
+contains many conditional statements as the control flow depends on
+input data.
+\subsubsection{Data Dependencies}
+A data dependency is a dependency where one statement depends on the
+same data as another statement. Data dependencies can be further
+classified into:
+\begin{itemize}
+    \item \textbf{True Dependencies (W to R)}: Where a
+          statement depends on the result of a previous
+          instruction.
+          \begin{minted}{c}
+a = 1;
+b = a; // True dependency on statement 1
+c = b; // True dependency on statement 1 and 2
+\end{minted}
+    \item \textbf{Anti-Dependence (R to W)}: Where a
+          statement requires a value that is later written to.
+          \begin{minted}{c}
+a = 1;
+b = a; // Anti-dependency on statement 3
+a = 2;
+\end{minted}
+    \item \textbf{Output Dependence (W to W)}: Where a
+          variable depends on the ordering of another write
+          statement.
+          \begin{minted}{c}
+// Output dependency between statements 1 and 3
+a = 1;
+b = a;
+a = 2;
+\end{minted}
+    \item \textbf{Input Dependence (R to R)}: Where a
+          statement reads
+          \begin{minted}{c}
+a = 1;
+b = a; // Input dependence on statement 3
+c = a; // Input dependence on statement 2
+\end{minted}
+          Note that the order of input dependencies do not need to be
+          preserved, as they do not affect the result of the program.
+\end{itemize}
+Data dependencies can be more challenging to determine when a program
+introduces pointers or references to objects, as such aliases may
+inadvertently introduce dependencies between statements. For example:
+\begin{minted}{c}
+T a = T::new();
+T *b = &a;       // b is a reference to a
+
+a.mutator_method();  // changes a
+b->mutator_method(); // also changes a
+\end{minted}
+In this example, some programming languages may not explicitly show the
+true dependency of the final statement.
+\subsubsection{Dependency Analysis}
+Dependency analysis allows us to determine whether it is safe to
+reorder or parallelise statements in a program. For example, given the
+following code:
+\begin{minted}{c}
+for (int i = 0; i < n; i++) {
+    for (int j = 0; j < n; j++) {
+        a[i][j + 1] = a[n][j];
+    }
+}
+\end{minted}
+we may wish to know whether there are any data dependencies between
+loop iterations. That is, does there exist an iteration \(\left( i_r,\:
+j_r \right)\) that reads the same array element that is written to by
+iteration \(\left( i_w,\: j_w \right)\)? Mathematically,
+\begin{align*}
+    \exists i_r,\: j_r,\: i_w,\: j_w : {} & 0 \leqslant i_r < n \land 0 \leqslant j_r < n \land {} \\
+                                          & 0 \leqslant i_w < n \land 0 \leqslant j_w < n \land {} \\
+                                          & i_w = n \land j_w + 1 = j_r.
+\end{align*}
+Another way to analyse a loop would be to draw an iteration space
+diagram, with one axis representing the iteration number and the other
+representing the array index. This allows us to visualise the
+dependencies between iterations.
+
+Unfortunately, any form of static dependency analysis is inexact
+in general.
+\begin{itemize}
+    \item Alias analysis is undecidable
+    \item Data dependence analysis are undecidable
+\end{itemize}
+When in doubt, we must assume that a dependency exists, and therefore
+cannot parallelise the code.
+\subsection{Automatic Parallelisation}
+Automatic parallelisation can be performed either
+\begin{itemize}
+    \item Automatically by the compiler, or
+    \item Manually by the programmer.
+\end{itemize}
+Current compilers are not smart enough to perform parallelisation in
+general as they are necessarily conservative in their analysis. On the
+other hand, manual parallelisation requires competence and can be very
+time-consuming and error-prone. 
 \end{document}
