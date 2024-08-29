@@ -281,7 +281,7 @@ This is known as \textbf{Simultaneous Multi-Threading (SMT)} or
 sets of registers and program counters (typically two) for each thread,
 with a shared set of functional units, that allow multiple threads to
 be executed in parallel.
-\section{Parallelisation}
+\section{Parallel Computing}
 \subsection{Forms of Parallelism}
 Parallelism can be achieved at multiple levels:
 \begin{itemize}
@@ -385,7 +385,7 @@ algorithm can be executed in parallel. This is known as exploiting
           as statements may have side effects that depend on the order
           of execution.
 \end{itemize}
-\subsubsection{Safe Parallelisation}
+\subsection{Safe Parallelisation}
 The process of parallelisation must be done in a manner that ensures
 the same result is produced as the sequential program. Two dependencies
 must be preserved to ensure safe parallelisation:
@@ -505,8 +505,8 @@ diagram, with one axis representing the iteration number and the other
 representing the array index. This allows us to visualise the
 dependencies between iterations.
 
-Unfortunately, any form of static dependency analysis is inexact
-in general.
+Unfortunately, any form of static dependency analysis is inexact in
+general.
 \begin{itemize}
     \item Alias analysis is undecidable
     \item Data dependence analysis are undecidable
@@ -522,5 +522,182 @@ Automatic parallelisation can be performed either
 Current compilers are not smart enough to perform parallelisation in
 general as they are necessarily conservative in their analysis. On the
 other hand, manual parallelisation requires competence and can be very
-time-consuming and error-prone. 
+time-consuming and error-prone.
+\subsection{Parallelisation Process}
+Generally, we can break the process of parallelisation into three
+steps:
+\begin{enumerate}
+    \item Determine what can be safely parallelised. This may involve:
+          \begin{itemize}
+              \item Analysing control and data dependencies.
+              \item Transforming the program to expose parallelism.
+              \item Employing a more efficient algorithm that is better
+                    suited for parallelism.
+          \end{itemize}
+    \item Decide if parallelism will increase performance:
+          \begin{itemize}
+              \item Is a significant amount of time spent in that code?
+              \item Is there a overhead associated with creating and
+                    managing threads?
+              \item Will the latency and/or throughput of communication
+                    between processors be a bottleneck?
+              \item Does parallelisation actually result in a speedup?
+          \end{itemize}
+    \item Transform the program into an explicitly parallel form:
+          \begin{itemize}
+              \item Use programming language constructs to map
+                    computation (and possibly data) to processors and
+                    appropriate synchronisation.
+          \end{itemize}
+\end{enumerate}
+\subsection{Parallelism Granularity}
+While a potential to parallelise code may exist, executing this code
+has an associated overhead due to the costs of creating and managing
+threads, the synchronisation of parallel computations, and the latency
+of messages sent between processors. Therefore the amount of
+computation in each ``work unit'' must be sufficiently large to offset
+this overhead.
+
+Here we can introduce the concept of \textbf{parallelism granularity},
+which is the size of the work unit that is executed in parallel.
+Generally,
+\begin{itemize}
+    \item \textbf{Coarse-grained parallelism} has large work units that
+          are executed in parallel. Distributed systems and clusters
+          are suited for coarse-grained parallelism.
+    \item \textbf{Fine-grained parallelism} has small work units that
+          are executed in parallel. CPUs with vector computation units
+          are suited for fine-grained parallelism.
+\end{itemize}
+\subsection{Speedup}
+The speedup of a parallel program is the ratio of the time taken to
+execute the best sequential program to the time taken to execute the
+parallel program:
+\begin{equation}
+    S = \frac{\text{execution time of best sequential program}}{\text{execution time of parallel program}}
+\end{equation}
+Note that the best sequential program is not the same as the parallel
+program restricted to a single processor, due to the aforementioned
+overheads. Rather, it is the best possible sequential program that can
+be written for the given problem, which may use different algorithms.
+\subsubsection{Speedup Curves}
+Commonly, we will plot the speedup of a parallel program against the
+number of processors used. The resulting curves can be classified into
+five categories:
+\begin{itemize}
+    \item \textbf{Super-Linear Speedup}: The speedup increases faster
+          than the number of processors used. This typically only occurs
+          in extreme cases where the parallel program runs on different
+          hardware that allows it to outperform the sequential program.
+    \item \textbf{Linear Speedup}: The speedup increases linearly with
+          the number of processors used. This is the ideal case, but is
+          rarely achieved due to overheads associated with parallelism.
+    \item \textbf{Sub-Linear Speedup}: The speedup increases slower than
+          the number of processors used. This is the most common case,
+          and often the speedup plateaus as the number of processors
+          increases.
+    \item \textbf{No Speedup}: The speedup remains constant as the
+          number of processors used increases. This indicates that the
+          program likely is not parallelisable.
+    \item \textbf{Slowdown}: The speedup decreases below 1 as the number
+          of processors used increases. This indicates that the overhead
+          of parallelism is greater than the benefits of parallelism.
+\end{itemize}
+\subsubsection{Scalable Parallelism}
+Typically an increase in problem size results in an increase in total
+execution time. In such cases, we want large problems to provide more
+potential for parallelism. A problem is said to be \textbf{scalable} if
+the speedup of the parallel program increases with the problem size,
+without plateauing.
+\subsubsection{Computational Complexity}
+While we may be able to achieve scalable parallelism, it is important
+to note that the computational complexity of the problem does not
+change. This is because the computational complexity of a problem is
+determined by the size of the problem, and distributing the problem
+across finitely many processors does not change the limiting behaviour
+of the problem.
+\begin{equation*}
+    \mathcal{O}\left( n \log{\left( n \right)} / c \right) = \mathcal{O}\left( n \log{\left( n \right)} \right)
+\end{equation*}
+(\(n\) is the size of the problem and \(c\) is the number of
+processors used).
+\subsubsection{Amdahl's Law}
+Amdahl's Law states that the speedup of a parallel program is limited
+by the fraction of the program that cannot be parallelised. If \(p\) is
+the fraction of the program that can be parallelised, then the
+theoretical speedup \(S\) of the execution of the program is given by:
+\begin{equation}
+    S = \frac{1}{\left( 1 - p \right) + p/s}
+\end{equation}
+where \(s\) is the speedup of the parallelisable portion of the program.
+\subsection{Parallelisation Methodology}
+When we want to parallelise a program, we can take the following steps:
+\begin{enumerate}
+    \item Obtain representative and realistic data sets.
+    \item Time and profile the sequential version of the program.
+    \item View the source code and understand the high-level structure
+          of the program.
+    \item Analyse dependencies.
+    \item Determine sections that can be parallelised.
+    \item Decide what parallelism might be worth exploiting.
+    \item Consider restructuring the program or replacing algorithms to
+          expose more parallelism.
+    \item Transform the program into an explicitly parallel form.
+    \item Test and debug the parallel version of the program.
+    \item Time and profile the parallel version of the program.
+    \item Determine issues inhibiting greater performance.
+\end{enumerate}
+\subsubsection{Timing and Profiling}
+When timing an application, we must:
+\begin{itemize}
+    \item Time a variety of data sets.
+    \item Time multiple times to get an average.
+    \item Be aware of other applications running in the background.
+    \item Compare performance under identical conditions.
+    \item Eliminate any unnecessary screen I/O by redirecting outputs
+          to a file.
+    \item Use high resolution timers.
+    \item Distinguish between timing the entire program and timing
+          specific sections.
+    \item Distinguish between real time (wall clock time) and CPU time
+          (time actually spent executing instructions in the program).
+    \item Be aware of one-off costs (e.g., just-in-time
+          compilation/dynamic library loading).
+\end{itemize}
+Profiling is the process of analysing the performance of a program by
+measuring the time spent in each section of the program. Profiling can
+capture time spent executing a section of code and the number of times
+that section is executed. Profiling can be done through sampling where
+the program counter is probed at regular intervals, or through
+instrumentation where the program is modified to record the time spent
+in each section. It is important to note that profiling can introduce
+overheads that may affect the performance of the program. Additionally,
+some compilers may allow the programmer to optimise a program aggressively
+so that the profiled program may not be representative of the actual
+program (i.e., sections may be optimised out or reordered).
+\subsection{Premature Optimisation}
+\begin{aside}
+    Roughly 80\% of effects come from 20\% of causes.
+
+    \raggedleft{\textbf{Pareto Principle}}
+\end{aside}
+\begin{quote}
+    ``There is no doubt that the grail of efficiency leads to abuse.
+    Programmers waste enormous amounts of time thinking about, or worrying
+    about, the speed of noncritical parts of their programs, and these
+    attempts at efficiency actually have a strong negative impact when
+    debugging and maintenance are considered. We should forget about small
+    efficiencies, say about 97\% of the time: premature optimization is the
+    root of all evil.
+
+    Yet we should not pass up our opportunities in that critical 3\%. A good
+    programmer will not be lulled into complacency by such reasoning, he
+    will be wise to look carefully at the critical code; but only after that
+    code has been identified. It is often a mistake to make a priori
+    judgments about what parts of a program are really critical, since the
+    universal experience of programmers who have been using measurement
+    tools has been that their intuitive guesses failed.''
+
+    \raggedleft{\textbf{Donald Knuth}}
+\end{quote}
 \end{document}
