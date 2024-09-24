@@ -782,9 +782,8 @@ when they are done, they are returned to the pool. New threads can also
 be added to the pool when necessary. Threaded applications can either
 use thread pools explicitly or use a high-level library that implements
 thread pools internally.
-\subsubsection{Load Balancing} When mapping
-work to processors, it is important to balance the work done by each
-processor. This can be done using
+\subsubsection{Load Balancing} When mapping work to processors, it is important to balance the work
+done by each processor. This can be done using
 \begin{itemize}
     \item \textbf{Dynamic work allocation}: where work is overdecomposed
           into many work units, typically far more than the number of
@@ -800,12 +799,424 @@ processor. This can be done using
           distributed, but can lead to processors idling if work is not
           evenly distributed. Work can be divided:
           \begin{itemize}
-            \item \textbf{By blocks}: which offer good locality
-                   but may suffer from poor load balance if work is not
-                   evenly distributed.
-            \item \textbf{Cyclically}: where work is assigned in a
-                  round-robin fashion. This can be good if work is evenly
-                  distributed, but can lead to poor locality.
+              \item \textbf{By blocks}: which offer good locality
+                    but may suffer from poor load balance if work is not
+                    evenly distributed.
+              \item \textbf{Cyclically}: where work is assigned in a
+                    round-robin fashion. This can be good if work is evenly
+                    distributed, but can lead to poor locality.
           \end{itemize}
 \end{itemize}
+\section{Synchronisation}
+Some parallel programs require threads to be executed in a particular
+order to ensure access to shared memory is correct.
+\subsection{Race Conditions}
+Consider the problem of adding the elements in an array.
+\begin{minted}{c}
+#define N 100
+
+int array[N] = {0};
+int sum = 0;
+
+for (int i = 0; i < NUM_THREADS; i++) {
+    thread_create(add, i);
+}
+
+void add(int thread_id)
+{
+    int block_size = ARRAY_SIZE / NUM_THREADS;
+    int start = thread_id * block_size;
+
+    if (start + block_size < N)
+    {
+        for (int i = start; i < start + block_size; i++)
+        {
+            sum += array[i];
+        }
+    }
+    else
+    {
+        for (int i = start; i < N; i++)
+        {
+            sum += array[i];
+        }
+    }
+}
+\end{minted}
+Assume at some point in time, the value of \mintinline{c}{sum} is
+\(s\), and let two threads be scheduled to execute the
+\mintinline{c}{add} function at indices \(i_1 = 20\) and \(i_2 = 30\),
+where \mintinline{c}{array} has the values 20 and 30. Now note that the
+compound operation being performed within the \mintinline{c}{add}
+function is not atomic, and will be expanded to the following
+operations for thread 1:
+\begin{enumerate}
+    \item Read \mintinline{c}{sum}.
+    \item Read \mintinline{c}{array} at index \(i_1\).
+    \item Add \mintinline{c}{sum} and \mintinline{c}{array[i1]}
+    \item Write result to \mintinline{c}{sum}.
+\end{enumerate}
+and similarly for thread 2:
+\begin{enumerate}
+    \item Read \mintinline{c}{sum}.
+    \item Read \mintinline{c}{array[i2]}
+    \item Add \mintinline{c}{sum} and \mintinline{c}{array[i2]}
+    \item Write result to \mintinline{c}{sum}.
+\end{enumerate}
+Due to the non-deterministic nature of context switching, it is possible,
+while unlikely, for a context switch to occur from thread 1 to thread 2,
+after Step 2. This results in the final write to \mintinline{c}{sum}
+being scheduled after thread 2 has finished executing it's operations:
+\begin{description}
+    \item [1.] Read \mintinline{c}{sum} (\(s\)).
+    \item [2.] Read \mintinline{c}{array[i1]} (\(20\)).
+    \item [1.] Read \mintinline{c}{sum} (\(s\)).
+          \raggedleft
+    \item [2.] Read \mintinline{c}{array[i2]} (\(30\)).
+    \item [3.] Add \mintinline{c}{sum} and \mintinline{c}{array[i2]} (\(s + 30\)).
+    \item [4.] Write result to \mintinline{c}{sum} (\(s_2 \gets s + 30\)).
+    \item [3.] Add \mintinline{c}{sum} and \mintinline{c}{array[i1]} (\(s + 20\)).
+          \raggedright
+    \item [4.] Write result to \mintinline{c}{sum} (\(s_1 \gets s + 20\)).
+\end{description}
+Observe how this fails to accumulate \mintinline{c}{array[i2]} into
+\mintinline{c}{sum} as the value of \mintinline{c}{sum} used by thread
+1 is outdated. This problem of synchronisation is known as a
+\textbf{race condition}, where the program relies on the
+non-deterministic scheduling and execution of threads.
+
+Note that non-deterministic behaviour is not always negative. In some
+cases, it is acceptable for there to be more than one equally correct
+result, or for there to be non-deterministic components that lead to
+the same final result. However, it should be noted that non-determinism
+can suggest the existence of a bug in a program, as such behaviour is
+often very difficult to debug.
+\subsection{Mutual Exclusion}
+Consider a program that has a segment of code that must be executed by
+several threads, called a \textbf{critical section}, in which threads
+may access and update shared memory. To prevent inconsistent accesses
+to this shared memory, we can enforce that only one thread may be
+inside the critical section at any time. This splits the program in the
+following manner:
+\begin{itemize}
+    \item \textbf{Entry protocol}: This protocol checks if any other
+          thread is currently in the critical section. If not, the
+          thread is allowed to enter the critical section.
+    \item \textbf{Critical section}: This section contains code that
+          accesses shared memory.
+    \item \textbf{Exit protocol}: This protocol signals that the thread
+          has finished executing the critical section.
+    \item \textbf{Remainder section}: This section contains code that
+          is executed after the critical section, and does not access shared
+          memory.
+\end{itemize}
+In this model, the following properties must also be satisfied:
+\begin{itemize}
+    \item \textbf{Mutual exclusion} (safety): Only one thread may be in
+          the critical section at any time.
+    \item \textbf{Progress} (liveness): If no thread is in the critical
+          section, and a thread wishes to enter the critical section,
+          then the thread will eventually be allowed to enter the
+          critical section.
+    \item \textbf{Bounded waiting} (fairness): If a thread wishes to
+          enter the critical section, then there is a bound on the
+          number of times other threads may enter the critical section
+          before the thread is allowed to enter.
+\end{itemize}
+It is important to maintain a queue of waiting threads in a way that
+ensures fairness and prevents starvation, where a thread is never
+allowed to enter the critical section.
+
+The following sections discuss various mechanisms that can be used to
+enforce mutual exclusion.
+\subsubsection{Mutex Lock}
+A \textbf{mutex} (short for mutual exclusion) is a binary lock that is
+either locked or unlocked. A thread that wishes to enter the critical
+section must first \textbf{acquire} the lock. If the lock is already
+held by another thread, the thread must wait until the lock is
+\textbf{released}. When the thread has finished executing the critical
+section, it must \textbf{release} the lock so that other threads may
+enter the critical section.
+\subsubsection{Semaphore}
+Semaphores are a generalisation of mutex locks that enforces mutual
+exclusion for shared memory that is accessed by multiple threads. A
+semaphore is an integer that represents the number of threads that may
+access a shared resource. A semaphore first calls the \textbf{wait}
+operation, which decrements the semaphore if the semaphore is greater
+than 0. Otherwise, the thread is blocked until the semaphore is equal
+to zero. This allows a thread to enter the critical section. The thread
+then calls the \textbf{signal} operation, which increments the
+semaphore, allowing one of the blocked threads to enter the critical
+section.
+\subsubsection{Monitors}
+A \textbf{monitor} is an abstract data type used in object-oriented
+programming to enforce mutual exclusion. A monitor encapsulates data
+with a set of methods that operate on that data, where each operation
+within the monitor is mutually exclusive. In addition to this, monitors
+provide \textbf{condition variables} that allow threads to wait for a
+certain condition to be met before proceeding. This allows a monitor to
+model more complex synchronisation patterns. Condition variables are
+equipped with a \textbf{wait} operation that blocks the thread until
+another thread signals the condition variable, and a \textbf{signal}
+operation that unblocks one of the waiting threads.
+\subsubsection{Dekker's Mutual Exclusion Algorithm}
+Dekker's algorithm is the first known correct solution to the mutual
+exclusion problem where threads communicate through shared memory. A C
+implementation of Dekker's algorithm is shown below:
+\begin{minted}{cpp}
+// Only thread 0 can modify lock[0]
+// Only thread 1 can modify lock[1]
+bool lock[2] = {false, false}; // initially neither thread has the lock
+
+// whose turn it is to enter the critical section
+int turn = 0; // initial value is arbitrary
+
+void T0()
+{
+    /* Entry protocol */
+    lock[0] = true; // thread 0 wants to enter the critical section
+
+    // thread 1 has already requested to enter the critical section
+    while (lock[1] == true)
+    {
+        if (turn == 1) // thread 1 is already in the critical section
+        {
+            lock[0] = false;  // release the lock
+            while (turn == 1) // wait until thread 1 has finished
+                ;
+            lock[0] = true;   // acquire the lock again
+        }
+    }
+
+    /* Critical section */
+
+    /* Exit protocol */
+    turn = 1;        // give the turn to thread 1
+    lock[0] = false; // release the lock
+
+    /* Remainder section */
+}
+
+void T1()
+{
+    /* Entry protocol */
+    lock[1] = true; // thread 1 wants to enter the critical section
+
+    // thread 0 has already requested to enter the critical section
+    while (lock[0] == true)
+    {
+        if (turn == 0) // thread 0 is already in the critical section
+        {
+            lock[1] = false;  // release the lock
+            while (turn == 0) // wait until thread 0 has finished
+                ;
+            lock[1] = true;   // acquire the lock again
+        }
+    }
+
+    /* Critical section */
+
+    /* Exit protocol */
+    turn = 0;        // give the turn to thread 0
+    lock[1] = false; // release the lock
+
+    /* Remainder section */
+}
+\end{minted}
+This algorithm guarantees mutual exclusion and prevents deadlocks and
+starvation.
+\subsection{Memory Consistency Models}
+A memory consistency model defines a set of rules that the hardware
+follows when operating on memory. These rules allow the programmer to
+make assumptions about the order in which memory operations are
+executed. A strong memory consistency model (\textbf{sequential
+consistency}) is one where:
+\begin{itemize}
+    \item All memory operations are executed in the order they are
+          specified in the program.
+    \item Memory operations within a single thread are executed in the
+          order they are specified in the program.
+\end{itemize}
+Here we cannot assume that operations from different threads will
+be executed in the relative order they are specified in the program.
+If we want the hardware to execute these operations efficiently, we may
+choose to relax some of these rules. An example of this may be to allow
+program execution to continue while a write operation is being requested.
+However, this can violate mutual exclusion if this write operation was
+to acquire a lock, and two competing threads try to enter their
+respective critical sections. Consider a simplified mutual exclusion
+model:
+\begin{minted}{c}
+void T0()
+{
+    /* Entry protocol */
+    lock[0] = true; // acquire a lock but don't wait for write
+
+    while (lock[1] != true)
+        ;
+
+    /* Critical section */
+
+    /* Exit protocol */
+    lock[0] = false;
+}
+
+void T1()
+{
+    /* Entry protocol */
+    lock[1] = true; // acquire a lock but don't wait for write
+
+    while (lock[0] != true)
+        ;
+
+    /* Critical section */
+
+    /* Exit protocol */
+    lock[1] = false;
+}
+\end{minted}
+By allowing both threads to execute the condition in the while loop
+before the lock has been acquired, we allow both threads to enter the
+critical section, violating mutual exclusion.
+\subsubsection{Atomic Hardware Operations}
+To promote safety, hardware can support atomic operations that perform
+writes, comparisons, swaps, etc., to ensure that mutual exclusion is
+satisfiable on relaxed memory consistency models. An example of an
+atomic hardware operation is shown below:
+\begin{minted}{c}
+while (!test_and_set(lock))
+    ;
+
+/* Critical section */
+lock = false;
+
+// requires hardware support to ensure atomic execution
+bool test_and_set(bool lock)
+{
+    if (!lock)
+        lock = true;
+
+    return lock;
+}
+\end{minted}
+\subsubsection{Active and Passive Waiting}
+When acquiring a lock, a thread could wait for another thread to
+release a lock in a number of different ways:
+\begin{itemize}
+    \item \textbf{Busy wait}: The thread continuously checks if the lock
+          has been released. This leads to wasted CPU cycles.
+          \begin{minted}{c}
+while (!test_and_set(lock))
+    ; // spinlock
+
+/* Critical section */
+lock = false;
+\end{minted}
+    \item \textbf{Sleeping}: The thread sleeps for a certain amount of
+          time before checking if the lock has been released. This can lead to
+          a delay in the thread entering the critical section and also requires
+          choosing an appropriate sleep duration.
+          \begin{minted}{c}
+while (!test_and_set(lock))
+    sleep(time);
+
+/* Critical section */
+lock = false;
+\end{minted}
+    \item \textbf{Suspending}: The thread is suspended until the thread
+          with the lock releases the lock. This can be done using condition
+          variables and can allow multiple threads to wait for a lock to be
+          released.
+          \begin{minted}{c}
+while (!test_and_set(lock))
+    event.wait(); // Suspend current thread
+
+/* Critical section */
+lock = false;
+event.signal(); // Signal other threads
+\end{minted}
+\end{itemize}
+It is crucial to ensure that a thread releases a lock after it has
+finished executing it's critical section to prevent threads from blocking
+other threads, especially if those threads can raise errors while executing
+their critical section.
+\subsection{Deadlocks}
+A \textbf{deadlock} is a situation where two or more threads are
+waiting for each other to release a lock, preventing any of the threads
+from progressing. Deadlocks can occur if four conditions hold
+simultaneously:
+\begin{itemize}
+    \item \textbf{Mutual exclusion}: Only one thread may hold a lock at
+          any time.
+    \item \textbf{Hold and wait}: A thread may hold a lock while waiting
+          for another lock.
+    \item \textbf{No preemption}: A lock may only be released voluntarily.
+    \item \textbf{Circular wait}: A cycle of threads waiting for locks
+          exists. For example, thread 0 is waiting for a lock held by
+          thread 1, thread 1 is waiting for a lock held by thread 2, and
+          thread 2 is waiting for a lock held by thread 0.
+\end{itemize}
+It is important to be mindful of deadlocks when working with more than
+one lock, as they prevent the program from progressing. Note that it may
+be possible to prevent deadlocks by ensuring that all locks are available
+before a thread enters the critical section, however, this requires
+cooperation between threads and may not always be possible. Therefore,
+locks are said to be \textbf{non-composable} as they break abstraction
+by exposing the internal state of the program, preventing software
+components from being developed independently.
+\subsubsection{Livelocks and Starvation}
+\textbf{Livelocks} are similar situtations to deadlocks, where instead
+of being completely blocked, threads are able to perform work, but
+unable to make progress. \textbf{Starvation} is a situation where a
+thread is unable to enter the critical section because it is never
+scheduled to run.
+\subsection{Priority Inversion}
+\textbf{Priority inversion} is a situation where a low-priority thread
+prevents a high-priority thread from executing. Consider the following
+scenario:
+\begin{enumerate}
+    \item A low priority thread acquires a lock for a resource.
+    \item A high priority thread waits for the lock to be released.
+    \item A medium priority thread that does not require the resource is
+          scheduled to run before the low priority thread as it is a
+          higher priority.
+\end{enumerate}
+This situation results in the high priority thread being blocked by both
+the low priority thread and the medium priority thread, resulting in a
+priority inversion.
+\subsection{Thread Safe Libraries}
+When calling library functions from different threads, it is important
+to ensure that such functions are thread safe, that is, they can be
+called from different threads without the risk of incorrect behaviour.
+An example of this is a random number generator that relies on a global
+seed---it is important to ensure that this seed is correctly updated
+when a random number is generated concurrently. A function can be
+thread-safe if:
+\begin{itemize}
+    \item it does not share state across concurrent invocations, or if
+    \item it uses mutex locks to protect access to shared state
+\end{itemize}
+\subsection{Barrier Synchronisation}
+A \textbf{barrier} is a synchronisation mechanism that allows threads
+to wait for each other to reach a certain point in the program before
+continuing. Most parallel programming frameworks provide automatic
+barrier synchronisation after a parallel section of code.
+\subsection{Ad hoc Synchronisation}
+Some operations may require ordering constraints between threads that
+must be satisfied for the program to execute correctly. This can be
+achieved using a condition variable that signals when a certain
+operation has been completed. An example of this is shown below:
+\begin{minted}{c}
+// Thread 0
+operation_A();
+A.signal(); // Signal that operation A has been completed
+operation_B();
+
+// Thread 1
+operation_C();
+A.wait(); // Wait for operation A to complete
+operation_D(); // Relies on operation A
+\end{minted}
+In this example, threads 0 and 1 can be executed independently, but
+operation D must be executed after operation A has been completed.
 \end{document}
