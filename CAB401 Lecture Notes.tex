@@ -690,14 +690,122 @@ program (i.e., sections may be optimised out or reordered).
     efficiencies, say about 97\% of the time: premature optimization is the
     root of all evil.
 
-    Yet we should not pass up our opportunities in that critical 3\%. A good
-    programmer will not be lulled into complacency by such reasoning, he
-    will be wise to look carefully at the critical code; but only after that
-    code has been identified. It is often a mistake to make a priori
-    judgments about what parts of a program are really critical, since the
-    universal experience of programmers who have been using measurement
-    tools has been that their intuitive guesses failed.''
+    Yet we should not pass up our opportunities in that critical 3\%. A
+    good programmer will not be lulled into complacency by such
+    reasoning, he will be wise to look carefully at the critical code;
+    but only after that code has been identified. It is often a mistake
+    to make a priori judgments about what parts of a program are really
+    critical, since the universal experience of programmers who have
+    been using measurement tools has been that their intuitive guesses
+    failed''.
 
     \raggedleft{\textbf{Donald Knuth}}
 \end{quote}
+\subsection{Explicit Parallelism}
+To transform a program into an explicitly parallel form, we must map
+computation and data to processors and synchronise processors at
+appropriate times. The exact mechanism for this depends on the
+programming model or parallelisation framework.
+\subsubsection{Parallel Programming Models}
+There are two ways of abstracting the underlying hardware that is used
+in parallel computing:
+\begin{itemize}
+    \item \textbf{Communicating Sequential Processes (CSP)}
+          \begin{itemize}
+              \item Processes operate independently and interact with
+                    each other solely through message-passing.
+              \item Both computation and data to processors.
+              \item Used by most distributed memory machines.
+          \end{itemize}
+    \item \textbf{Parallel Random Access Machine (PRAM)}
+          \begin{itemize}
+              \item Processes operate asynchronously and have
+                    constant-time access to shared memory.
+              \item Only computation needs to be mapped to processors.
+              \item Used for thread level parallelism.
+          \end{itemize}
+\end{itemize}
+\subsection{Mapping Computation to Processors}
+When mapping threads to processors, they can either be created
+explicitly or implicitly:
+\begin{itemize}
+    \item Explicit threads
+          \begin{itemize}
+              \item Created by the programmer in code using a function
+                    call.
+              \item Usually associated with a function that is executed
+                    when the thread is first started.
+              \item Threads are explicitly started, stopped, or paused.
+          \end{itemize}
+    \item Implicit threads
+          \begin{itemize}
+              \item Created by a high-level library that builds on top
+                    of primitive threading libraries.
+              \item The programmer must only indicate what calculations
+                    can be performed in parallel.
+              \item Thread creation, management, and synchronisation is
+                    handled by the library.
+          \end{itemize}
+\end{itemize}
+\subsubsection{Thread Scheduling}
+Threads are mapped to processors by the \textbf{scheduler} which is
+part of the operating system. This allows different threads to be
+mapped to different processors, and allows situations with more threads
+than processors to be handled through interleaving. Threads can be
+assigned a relative \textbf{priority} which the scheduler uses to
+determine which thread to execute next. Threads can also be assigned a
+\textbf{processor affinity} to ensure that they are always executed on
+the same processor. This can be useful when we want to reuse local
+caches.
+
+There are several scheduling algorithms that the operating system can
+use to determine which thread to execute next:
+\begin{itemize}
+    \item \textbf{Pre-emptive}: The scheduler can interrupt a thread
+          that is currently executing to run another thread of a higher
+          priority.
+    \item \textbf{Cooperative}: The scheduler relies on threads to
+          voluntarily yield control to other threads.
+    \item \textbf{Round Robin}: Each thread is given a fixed time slice
+          to execute before the next thread is executed.
+    \item \textbf{First-Come, First-Served (FCFS)}: Threads are executed
+          in the order they are created.
+    \item \textbf{Shortest Job First (SJF)}: Threads are executed in
+          order of the time they are expected to take to complete.
+\end{itemize}
+\subsubsection{Thread Pools}
+As creating new threads is an expensive operation, we can instead
+create a pool of threads at the start of a program to avoid needing to
+create and destroy threads each time we want to parallelise a section
+of code. When threads are needed, they are taken from the pool, and
+when they are done, they are returned to the pool. New threads can also
+be added to the pool when necessary. Threaded applications can either
+use thread pools explicitly or use a high-level library that implements
+thread pools internally.
+\subsubsection{Load Balancing} When mapping
+work to processors, it is important to balance the work done by each
+processor. This can be done using
+\begin{itemize}
+    \item \textbf{Dynamic work allocation}: where work is overdecomposed
+          into many work units, typically far more than the number of
+          processors. This is good if execution times are unpredictable
+          or if the work is not evenly distributed, but can have
+          larger overheads. Another approach can involve creating work
+          pools where we have a queue of tasks awaiting execution. Here
+          work can be centralised or decentralised and work can be
+          stolen from other processors if a processor runs out of work.
+    \item \textbf{Static work allocation}: where work is divided into
+          equal-sized chunks and assigned to each processor. This is
+          good if execution times are predictable and work is evenly
+          distributed, but can lead to processors idling if work is not
+          evenly distributed. Work can be divided:
+          \begin{itemize}
+            \item \textbf{By blocks}: which offer good locality
+                   but may suffer from poor load balance if work is not
+                   evenly distributed.
+            \item \textbf{Cyclically}: where work is assigned in a
+                  round-robin fashion. This can be good if work is evenly
+                  distributed, but can lead to poor locality.
+          \end{itemize}
+\end{itemize}
 \end{document}
