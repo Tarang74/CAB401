@@ -1177,8 +1177,8 @@ scenario:
 \begin{enumerate}
     \item A low priority thread acquires a lock for a resource.
     \item A high priority thread waits for the lock to be released.
-    \item A medium priority thread that does not require the resource is
-          scheduled to run before the low priority thread as it is a
+    \item A medium priority thread that does not require the resource
+          is scheduled to run before the low priority thread as it is a
           higher priority.
 \end{enumerate}
 This situation results in the high priority thread being blocked by both
@@ -1219,4 +1219,349 @@ operation_D(); // Relies on operation A
 \end{minted}
 In this example, threads 0 and 1 can be executed independently, but
 operation D must be executed after operation A has been completed.
+\section{Locality}
+\subsection{Array Layout}
+We can define static arrays in C using the following syntax:
+\begin{minted}{c}
+int array[N];   // array of N integers
+int array[N][M]; // 2D array of N rows and M columns
+\end{minted}
+In most languages, 2D arrays are stored in row-major order, where the
+elements of each row are stored contiguously in memory, one after the
+other. This allows for efficient access to elements in the same row as
+they are stored in adjacent memory locations. In C, we can access the
+element at row \(i\) and column \(j\) of a 2D array using the following
+syntax:
+\begin{minted}{c}
+array[i][j] // *(((int *) array) + i * M + j)
+\end{minted}
+where \mintinline{c}{M} is the number of columns in the array. If the
+length of an array is not known at compile time, we can create a
+dynamic array using a heap allocation:
+\begin{minted}{c}
+int *array = (int *) malloc(sizeof(int) * N);
+\end{minted}
+This lets us allocate an array of \(N\) integers on the heap. We can
+access the element at index \(i\) of the array using the same syntax as
+before. Furthermore, we can construct a multi-dimensional array by
+allocating memory for each row of the array separately:
+\begin{minted}{c}
+int **array = (int **) malloc(sizeof(int *) * N);
+for (int i = 0; i < N; i++)
+{
+    array[i] = (int *) malloc(sizeof(int) * M);
+}
+\end{minted}
+This allows us to access the element at row \(i\) and column \(j\) of
+the array using the same syntax as before, as the array is defined as a
+pointer to a pointer to an integer. If we wanted all elements of the 2d
+array to be stored contiguously in memory, we would need to flatten the
+array and allocate memory for all elements at once:
+\begin{minted}{c}
+int *array = (int *) malloc(sizeof(int) * N * M);
+\end{minted}
+Note that we can no longer access the element at row \(i\) and column
+\(j\) of the array using the same syntax as before, as the array is
+defined as a pointer to an integer. Instead, we must use:
+\begin{minted}{c}
+array[i * M + j] // *(array + i * M + j)
+\end{minted}
+One advantage of creating a flattened array is that it allows for
+better cache locality, as all elements are stored contiguously in
+memory. On the contrary, multi-dimensional arrays allow arrays to be
+jagged, where rows can have a different number of columns.
+\subsection{Cache Locality}
+Locality of reference is the principle that memory locations that have
+been recently accessed are likely to be accessed again in the near
+future. There are two types of locality:
+\begin{itemize}
+    \item \textbf{Temporal locality}: If a memory location is accessed,
+          it is likely to be accessed again in the near future.
+    \item \textbf{Spatial locality}: If a memory location is accessed,
+          memory locations near it are likely to be accessed in the near
+          future.
+\end{itemize}
+When data is loaded into the cache, it is loaded in blocks of memory
+called \textbf{cache lines}, typically 128 bytes in size, allowing
+adjacent memory locations to be accessed quickly. If we consider a
+simple matrix multiplication algorithm:
+\begin{minted}{c}
+for (int i = 0; i < N; i++)
+{
+    for (int j = 0; j < N; j++)
+    {
+        for (int k = 0; k < N; k++)
+        {
+            C[i][j] = C[i][j] + A[i][k] * B[k][j];
+        }
+    }
+}
+\end{minted}
+As arrays are stored in row-major order, we have good temporal locality
+when accessing elements of \mintinline{text}{C}, given that the indices
+\mintinline{text}{i} and \mintinline{text}{j} do not change between
+iterations of the innermost loop. Additionally, we have good spatial
+locality when accessing elements of \mintinline{text}{A}, as the
+innermost loop accesses elements of \mintinline{text}{A} in a
+contiguous manner. However, we have poor locality when accessing
+elements of \mintinline{text}{B}, as the innermost loop accesses
+elements of \mintinline{text}{B} in a non-contiguous manner.
+\subsection{False Sharing}
+False sharing is a situation where two threads access different data
+that belongs to the same cache line. If we consider the above matrix
+multiplication example with two threads modifying disjoint columns of
+\mintinline{text}{C}, the first thread may load a cache line
+corresponding to the first column of \mintinline{text}{C}, which may
+contain elements that are accessed by the second thread, even though it
+is not accessing those elements. Then, as the second thread modifies
+elements of those other columns, the cache line from the first thread
+is invalidated as it is shared with another thread. To avoid this
+problem, we can align these memory accesses so that they coincide with
+cache lines, ensuring that each thread accesses its own cache line.
+\subsection{Eliminating ``False'' Dependencies}
+In some cases, data dependencies may be eliminated by introducing new
+variables without changing the outcome of a program. Consider the
+following examples:
+\begin{itemize}
+    \item \textbf{Flow Dependence}:
+          \begin{minted}{c}
+f = 42;
+...
+a = f + 19;
+    \end{minted}
+          The order of the statements in this example is important, and
+          cannot be changed. This is a true dependence.
+    \item \textbf{Anti Dependence}:
+          \begin{minted}{c}
+b = f + 42;
+...
+f = 42;
+
+// can be rewritten as
+b = f + 42;
+
+f2 = 42;
+    \end{minted}
+          Here any subsequent reads of \mintinline{text}{f} will read
+          the value of \mintinline{text}{f2} instead of the original
+          value of \mintinline{text}{f}, allowing the statements to be
+          reordered.
+    \item \textbf{Output Dependence}:
+          \begin{minted}{c}
+f = 42;
+...
+f = 19;
+
+// can be rewritten as
+f = 42;
+...
+f2 = 19;
+    \end{minted}
+          Here the value of \mintinline{text}{f} is not used after the
+          second assignment, so the statements can be reordered.
+\end{itemize}
+We can also eliminate false dependencies in loops. For example, there is
+flow dependence in the following loop the first line to the second line:
+\begin{minted}{c}
+int b;
+
+for (int i = 0; i < N; i++)
+{
+    b = a[i] + d[i];
+    c[i] = b * 2 + (b - 1);
+}
+\end{minted}
+Additionally, as \mintinline{text}{b} is shared between iterations of
+the loop, there is an anti-dependence of the second line between
+iterations of the loop. These dependencies can be eliminated by using
+the following techniques:
+\begin{itemize}
+    \item \textbf{Thread Local Memory}: Each thread has its own copy of
+          \mintinline{text}{b} that is not shared with other threads.
+          \begin{minted}{c}
+for (int i = 0; i < N; i++)
+{
+    int b = a[i] + d[i];
+    c[i] = b * 2 + (b - 1);
+}
+    \end{minted}
+          We can similarly promote the scalar variable
+          \mintinline{text}{b} to an array, however this may consume
+          more memory.
+    \item \textbf{Creating Copies of Read-Only Variables}: If a variable
+          is read-only, we can create multiple copies of the data to be
+          shared between threads.
+\end{itemize}
+\subsection{Memory Access Optimisations}
+We can further optimise memory accesses in loops by:
+\begin{itemize}
+    \item Introducing \textbf{padding} to ensure that data is aligned
+          with cache lines. This may be done by increasing the size of
+          the data to be a power of 2.
+          \begin{minted}{c}
+int array[1000][1000];
+
+for (int i = 0; i < 1000; i++)
+{
+    for (int j = 0; j < 1000; j++)
+    {
+        array[i][j] = 0;
+    }
+}
+
+// can be transformed to
+int array[1024][1024]; // extend the array dimensions to 1024
+
+for (int i = 0; i < 1024; i++)
+{
+    for (int j = 0; j < 1024; j++)
+    {
+        array[i][j] = 0;
+    }
+}
+          \end{minted}
+    \item \textbf{Tiling} loops to improve spatial locality. This involves
+          breaking the loop into smaller blocks that can be loaded into
+          the cache.
+          \begin{minted}{c}
+for (int x = 0; x < N; x++)
+{
+    for (int y = 0; y < M; y++)
+    {
+        S1(x, y);
+    }
+}
+
+// can be transformed to
+for (int x = 0; x < N; x += 32)
+{
+    for (int y = 0; y < M; y += 32)
+    {
+        // loop over blocks of size 32x32
+        for (int dx = x; dx < x + 32; dx++)
+        {
+            for (int dy = y; dy < y + 32; dy++)
+            {
+                S1(dx, dy);
+            }
+        }
+    }
+}
+\end{minted}
+    \item \textbf{Interchanging} loops for coarse grain parallelism or
+    better spatial locality.
+          \begin{minted}{c}
+for (int i = 0; i < N; i++) // spatially local loop
+{
+    for (int j = 0; j < M; j++) // parallelisable loop
+    {
+        S1(i, j);
+    }
+}
+
+// can be transformed to
+for (int j = 0; j < M; j++) // coarse grain parallelism
+{
+    for (int i = 0; i < N; i++) // better spatial locality
+    {
+        S1(i, j);
+    }
+}
+\end{minted}
+    Here the \(j\) loop may be parallelisable, in which case making it
+    the outer loop can allow for coarse grain parallelism. Or, the \(i\)
+    loop may be iterating over the rows of a matrix, allowing for
+    better spatial locality.
+    \item \textbf{Loop Fusion} to allow for better temporal locality.
+          \begin{minted}{c}
+for (int i = 0; i < N; i++)
+{
+    S1(i);
+}
+
+for (int i = 0; i < N; i++)
+{
+    S2(i); // may use data from S1
+}
+
+// can be transformed to
+for (int i = 0; i < N; i++)
+{
+    S1(i);
+    S2(i); // data access is localised from previous operation
+}
+\end{minted}
+    \item \textbf{Loop Distribution} to allow potential parallelism.
+          \begin{minted}{c}
+for (int i = 0; i < N; i++)
+{
+    S1(i); // can be parallelised
+    S2(i); // cannot be parallelised
+}
+
+// can be transformed to
+for (int i = 0; i < N; i++) // parallelisable loop
+{
+    S1(i);
+}
+
+for (int i = 0; i < N; i++) // non-parallelisable loop
+{
+    S2(i);
+}
+\end{minted}
+    \item \textbf{Loop Peeling} may be used to remove parts of a loop
+    that are more expensive than others.
+          \begin{minted}{c}
+for (int i = 0; i < N; i++)
+{
+    S1(i); // S1(0) is more expensive than remaining iterations
+           // or may be read by all subsequent iterations
+}
+
+// can be transformed to
+S1(0); // extract the first iteration
+for (int i = 1; i < N; i++) // may parallelise remaining iterations
+{
+    S1(i);
+}
+\end{minted}
+    \item \textbf{Loop Unrolling} may be used to remove loops entirely
+    by manually unrolling them. This may be useful for small loops.
+    Here we avoid the overhead of the loop counter and can more finely
+    control which iterations are parallelised.
+          \begin{minted}{c}
+for (int i = 0; i < N; i++)
+{
+    S1(i);
+}
+
+// can be transformed to
+S1(0);
+S1(1);
+...
+S1(N - 1);
+\end{minted}
+\end{itemize}
+\subsection{Barriers for Parallelisation Speedup}
+To overcome barries when parallelising code, we can consider the
+following:
+\begin{itemize}
+    \item If the overhead of parallelisation is too high:
+        \begin{itemize}
+            \item look for more coarse-grained parallelism
+        \end{itemize}
+    \item If some threads are doing more work than others:
+        \begin{itemize}
+            \item use dynamic work allocation to balance the work across cores
+            \item overdecompose the work into many work units by creating
+            more threads than cores to ensure that all cores are kept busy
+        \end{itemize}
+    \item If threads are waiting for each other:
+        \begin{itemize}
+            \item lock at different granularities
+        \end{itemize}
+    \item Apply loop transformations to expose parallelism
+    \item Alter data structures to improve data locality
+\end{itemize}
 \end{document}
