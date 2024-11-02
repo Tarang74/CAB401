@@ -24,6 +24,8 @@ This repository provides **lecture notes** for **CAB401 - High Performance and P
 2. Parallel Computing
 3. Synchronisation
 4. Locality
+5. Graphics Processing Units
+6. Parallel Programming
 
 ---
 
