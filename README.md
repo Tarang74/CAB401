@@ -23,6 +23,7 @@ This repository provides **lecture notes** for **CAB401 - High Performance and P
 1. Processor Design
 2. Parallel Computing
 3. Synchronisation
+4. Locality
 
 ---
 
