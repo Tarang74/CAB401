@@ -1449,7 +1449,7 @@ for (int x = 0; x < N; x += 32)
 }
 \end{minted}
     \item \textbf{Interchanging} loops for coarse grain parallelism or
-    better spatial locality.
+          better spatial locality.
           \begin{minted}{c}
 for (int i = 0; i < N; i++) // spatially local loop
 {
@@ -1468,10 +1468,10 @@ for (int j = 0; j < M; j++) // coarse grain parallelism
     }
 }
 \end{minted}
-    Here the \(j\) loop may be parallelisable, in which case making it
-    the outer loop can allow for coarse grain parallelism. Or, the \(i\)
-    loop may be iterating over the rows of a matrix, allowing for
-    better spatial locality.
+          Here the \(j\) loop may be parallelisable, in which case
+          making it the outer loop can allow for coarse grain
+          parallelism. Or, the \(i\) loop may be iterating over the
+          rows of a matrix, allowing for better spatial locality.
     \item \textbf{Loop Fusion} to allow for better temporal locality.
           \begin{minted}{c}
 for (int i = 0; i < N; i++)
@@ -1511,7 +1511,7 @@ for (int i = 0; i < N; i++) // non-parallelisable loop
 }
 \end{minted}
     \item \textbf{Loop Peeling} may be used to remove parts of a loop
-    that are more expensive than others.
+          that are more expensive than others.
           \begin{minted}{c}
 for (int i = 0; i < N; i++)
 {
@@ -1527,9 +1527,9 @@ for (int i = 1; i < N; i++) // may parallelise remaining iterations
 }
 \end{minted}
     \item \textbf{Loop Unrolling} may be used to remove loops entirely
-    by manually unrolling them. This may be useful for small loops.
-    Here we avoid the overhead of the loop counter and can more finely
-    control which iterations are parallelised.
+          by manually unrolling them. This may be useful for small loops.
+          Here we avoid the overhead of the loop counter and can more finely
+          control which iterations are parallelised.
           \begin{minted}{c}
 for (int i = 0; i < N; i++)
 {
@@ -1548,20 +1548,602 @@ To overcome barries when parallelising code, we can consider the
 following:
 \begin{itemize}
     \item If the overhead of parallelisation is too high:
-        \begin{itemize}
-            \item look for more coarse-grained parallelism
-        \end{itemize}
+          \begin{itemize}
+              \item look for more coarse-grained parallelism
+          \end{itemize}
     \item If some threads are doing more work than others:
-        \begin{itemize}
-            \item use dynamic work allocation to balance the work across cores
-            \item overdecompose the work into many work units by creating
-            more threads than cores to ensure that all cores are kept busy
-        \end{itemize}
+          \begin{itemize}
+              \item use dynamic work allocation to balance the work
+                    across cores
+              \item overdecompose the work into many work units by
+                    creating more threads than cores to ensure that all
+                    cores are kept busy
+          \end{itemize}
     \item If threads are waiting for each other:
-        \begin{itemize}
-            \item lock at different granularities
-        \end{itemize}
+          \begin{itemize}
+              \item lock at different granularities
+          \end{itemize}
     \item Apply loop transformations to expose parallelism
     \item Alter data structures to improve data locality
 \end{itemize}
+\section{Graphics Processing Units}
+A graphics processing unit (GPU) is specialised hardware that is
+designed to perform parallel computations on extremely large amounts of
+data. GPUs were originally designed to accelerate the rendering of 3D
+graphics, but are increasingly used for general-purpose computing.
+\subsection{Graphics Rendering Pipeline}
+Consider a video game that renders a 4K image at 60 frames per second.
+This requires \(3840 \times 2160 \times 60 = \num{497664000}\) pixel
+updates per second. This massive workload is handled by the graphics
+rendering pipeline, a sequence of stages that transform abstract 3D
+data into a final 2D image displayed on the screen.
+\begin{enumerate}
+    \item \textbf{Vertex Shader}: Vertices are individual points in 3D
+          space that define the shapes of objects. The vertex shader processes
+          each vertex independently, transforming them according to the
+          camera's perspective and other transformations such as scaling
+          or rotation.
+    \item \textbf{Shape Assembly}: After vertices are processed, they
+          are assembled into geometric shapes (typically triangles),
+          which represent the surface of 3D objects.
+    \item \textbf{Geometry Shader} (\textit{optional}): Additional
+          vertices may be added or modified based on the existing geometry to
+          add details to the shape before it is rasterised.
+    \item \textbf{Rasterisation}: Geometric shapes are converted into
+          pixels on a 2D grid. Each shape is broken into fragments that map
+          onto the screen, allowing for pixel-level processing.
+    \item \textbf{Fragment Shader}: Each fragment is processed to determine
+          the colour of each pixel. The fragment shader applies lighting,
+          textures, and other effects to calculate the colour and intensity of
+          each fragment.
+    \item \textbf{Tests and Blending}: Depth and stencil tests are
+          performed to determine if a fragment should be visible or obscured.
+          Blending operations can combine colours from multiple translucent
+          layers to produce the final output rendered to the screen.
+\end{enumerate}
+\subsection{General Purpose GPUs}
+GPUs are massively parallel high-throughput processors that can perform
+simple operations on a large scale. Over the years, it has become
+easier to program GPUs for general-purpose computing, where we can
+create custom shaders to perform parallel computations on scientific
+data, machine learning models, and other applications. Due to this, we
+treat GPUs as co-processors to the CPU, where the CPU is the
+\textbf{host} and the GPU is the \textbf{device} which helps accelerate
+computations. This involves the following steps:
+\begin{enumerate}
+    \item \textbf{Process Initialisation}: The host initialises the
+          process and allocates memory for the data to be processed.
+    \item \textbf{Data Transfer}: The host transfers the data to the
+          device for processing.
+    \item \textbf{Kernel Execution}: The host launches a kernel on the
+          device, which is a function that is executed in parallel by
+          multiple threads.
+    \item \textbf{Data Transfer}: The device transfers the processed
+          data back to the host.
+\end{enumerate}
+In this process, the host and device have separate memory spaces, and
+therefore any transfer of data between the host and device is a
+bottleneck in the process, due to the high latency and low bandwidth of
+the transfer bus. To mitigate this, we can limit the number of data
+transfers between the host and device by loading data on the device for
+as long as possible before transferring it back to the host. In some
+cases we can use middleware to manage the data transfer between the host
+and device, where we can assume the memory spaces are unified, however
+it is often more efficient to manage the data transfer manually.
+\subsection{GPU Architecture}
+GPUs are composed of multiple \textbf{streaming multiprocessors} (SMs),
+each of which contains many processing \textbf{cores}. A streaming
+multiprocessor is made up of multiple \textbf{warp schedulers} that
+schedule \textbf{warps} of threads to be executed on the cores. These
+warps are groups of 32 threads that all execute the same instruction in
+parallel. Each streaming multiprocessor also has its own \textbf{shared
+memory} that can be accessed by all threads in the warp, and a set of
+\textbf{registers} that are used to store temporary data. Each core is
+a simple functional unit that can perform floating-point or integer
+arithmetic operations which does not have it's own program counter.
+These cores are not as complex as those in a CPU as they are designed
+to execute the same instruction on many threads in parallel.
+\subsection{GPU Programming}
+When developing a GPU kernel, we must consider the following:
+\begin{itemize}
+    \item \textbf{Threads}: As with CPUs, we can create threads on a GPU
+          to perform computations in parallel. Due to the abundance of
+          threads, we can create many more threads on a GPU than on a CPU
+          without incurring a significant overhead.
+    \item \textbf{Thread Blocks}: We can group threads into \textbf{thread
+              blocks} which can be executed by a single streaming multiprocessor.
+          These thread blocks typically contain 1024 threads.
+    \item \textbf{Grids}: If we have multiple streaming multiprocessors, we
+          can also group thread blocks into \textbf{grids} which can be
+          executed in parallel.
+\end{itemize}
+When thread blocks are scheduled to run on the GPU, they are executed in
+groups of 32 threads\footnote{
+    This number may vary depending on the GPU architecture.
+} called \textbf{warps}. Each thread in a warp is executed in parallel
+on a streaming multiprocessor. An example of a simple GPU kernel to
+multiply two matrices is shown below:
+\begin{minted}{cpp}
+void matrix_multiply(float* A, float* B, float* C, int N)
+{
+    for (int i = 0; i < N; i++)
+    {
+        for (int j = 0; j < N; j++)
+        {
+            float sum = 0.0f;
+            for (int k = 0; k < N; k++)
+            {
+                sum += A[i * N + k] * B[k * N + j];
+            }
+            C[i * N + j] = sum;
+        }
+    }
+}
+
+__global__ void matrix_multiply_kernel(float* A, float* B, float* C, int N)
+{
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i < N && j < N)
+    {
+        float sum = 0.0f;
+        for (int k = 0; k < N; k++)
+        {
+            sum += A[i * N + k] * B[k * N + j];
+        }
+        C[i * N + j] = sum;
+    }
+}
+\end{minted}
+In this example, the \mintinline{cpp}{blockIdx.x} and
+\mintinline{cpp}{blockDim.x} variables are used to determine the
+position of the thread block in the grid, and the size of the thread
+block, respectively. The \mintinline{cpp}{threadIdx.x} variable is used
+to determine the position of the thread within the thread block. The
+\mintinline{cpp}{__global__} keyword is used to indicate that the
+function is a GPU kernel that is designed to be run on the GPU, to be
+called from the host. The kernel function is then launched from the
+host using the following syntax:
+\begin{minted}{cpp}
+dim2 grid_size(N / BLOCK_SIZE, N / BLOCK_SIZE);
+dim2 block_size(BLOCK_SIZE, BLOCK_SIZE);
+matrix_multiply_kernel<<<grid_size, block_size>>>(A, B, C, N);
+\end{minted}
+where \mintinline{cpp}{grid_size} and \mintinline{cpp}{block_size} are
+\mintinline{cpp}{dim2} or \mintinline{cpp}{dim3} structures that define
+the size of the grid (number of blocks), and the size of the thread
+block, respectively.
+
+Note that we loop over both the rows and columns of the matrix in the
+kernel, so that each thread only operates on the innermost loop of the
+algorithm. This lets us take advantage of the large number of cores
+available, and ensures each thread does very fine-grained work. It also
+allows for better memory access patterns and improves the performance
+of the kernel. The additional \mintinline{cpp}{if} statement ensures
+that if the number of threads is not a multiple of the number of
+elements in the matrix, the kernel will not access memory outside the
+bounds of the matrix.
+
+In addition to the kernel, we must also allocate memory on the device
+to store the input and output matrices, and transfer the data back to
+the host after the kernel has finished executing.
+\subsubsection{Optimising Warp Scheduling}
+When writing GPU kernels, it is important to consider how warps are
+scheduled to run on the GPU. As all threads in a streaming
+multiprocessor are scheduled to run at the same time, it is important
+to ensure they can all execute. For example, in the following code,
+some threads will execute a different instruction to others, causing
+the warp to diverge:
+\begin{minted}{cpp}
+if (threadIdx.x % 2 == 0)
+{
+    // do something
+}
+else
+{
+    // do something else
+}
+\end{minted}
+In this case, half of the threads in the warp will execute the first
+branch, and the other half will execute the second branch. Given the
+architecture of the GPU, the warp will execute each path sequentially,
+rather than in parallel, as it cannot tell half of the threads to
+execute branch 1 and the other half to execute branch 2. This can lead
+to a loss in performance, as the warp will take longer to execute the
+kernel. To avoid this, we should write kernel code to ensure that all
+threads perform SIMD operations instead.
+\subsection{Memory Access}
+As we saw in the above example, each thread in a warp has its own local
+memory that is stored in the register file, for example, the iterators
+\mintinline{cpp}{i}, \mintinline{cpp}{j}, and \mintinline{cpp}{k} in
+the matrix multiplication kernel. If we wish to share memory between
+threads in a warp, we can use the shared memory space available to each
+streaming multiprocessor. This acts as an L1 cache for the streaming
+multiprocessor, and is much faster than global memory. An example of
+using shared memory in a kernel is shown below:
+\begin{minted}{cpp}
+__global__ void matrix_multiply_kernel(float* A, float* B, float* C, int N)
+{
+    __shared__ float shared_A[BLOCK_SIZE][BLOCK_SIZE];
+    __shared__ float shared_B[BLOCK_SIZE][BLOCK_SIZE];
+
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    float sum = 0.0f;
+    for (int k = 0; k < N; k += BLOCK_SIZE)
+    {
+        shared_A[threadIdx.x][threadIdx.y] = A[i * N + k + threadIdx.y];
+        shared_B[threadIdx.x][threadIdx.y] = B[(k + threadIdx.x) * N + j];
+
+        __syncthreads();
+
+        for (int kk = 0; kk < BLOCK_SIZE; kk++)
+        {
+            sum += shared_A[threadIdx.x][kk] * shared_B[kk][threadIdx.y];
+        }
+
+        __syncthreads();
+    }
+
+    C[i * N + j] = sum;
+}
+\end{minted}
+In this example, we use shared memory to store blocks of the input
+matrices \mintinline{cpp}{A} and \mintinline{cpp}{B} that are used by
+each thread in the thread block. We then use the
+\mintinline{cpp}{__syncthreads()} function to synchronise all threads
+in the thread block before proceeding to the next iteration of the
+loop. This ensures that all threads have finished writing to shared
+memory before any thread reads from it.
+
+Additionally, if we want per-device shared memory access across
+multiple streaming multiprocessors, we can use the
+\mintinline{cpp}{__global__} keyword. This uses the GPU memory which is
+slower than accessing local registers and the shared memory cache. In
+the first example, this correspond to matrices \mintinline{cpp}{A},
+\mintinline{cpp}{B}, and \mintinline{cpp}{C}. Finally, we can also
+access host memory from the device, however this is the slowest form of
+memory access and should be minimised where possible.
+\subsection{Synchronisation}
+Synchronisation is only allowed within blocks, and therefore blocks
+must be independent of each other. Any synchronisation between blocks
+is not possible, but there is however an implicit barrier between
+kernels, where the host waits for all blocks within a kernel to finish
+executing before proceeding to the next kernel. For example:
+\begin{minted}{cpp}
+kernel1<<<grid_size, block_size>>>(...);
+// implicit barrier
+kernel2<<<grid_size, block_size>>>(...);
+\end{minted}
+To synchronise threads within a block, we can use the
+\mintinline{cpp}{__syncthreads()} function, which ensures that all
+threads in the block have reached the same point in the kernel before
+proceeding. This is useful when using shared memory to ensure that all
+threads have finished writing to shared memory before any thread reads
+from it.
+\subsection{Thread and Block Heuristics}
+When writing GPU kernels, it is important to consider the following
+heuristics:
+\begin{itemize}
+    \item When calling a kernel, we must consider the dimension and
+          size of blocks per grid and the dimension and size of threads
+          per block. The key consideration is to keep the entire GPU
+          busy by choosing the optimal number of threads per block and
+          blocks per grid.
+    \item The multi-dimensional nature of these parameters allows
+          easier mapping of multi-dimensional problems to CUDA and does
+          not play any role in performance.
+    \item Thread instructions are executed sequentially and as a
+          result, the only way to hide latency is to execute multiple
+          warps while one is busy.
+    \item The number of threads per block should be a multiple of 32 so
+          that all warps within that block use all cores within on that
+          multiprocessor.
+    \item the number of blocks in a grid should be larger than the
+          number of multiprcessors so that all multiprocessors are kept
+          busy.
+\end{itemize}
+\section{Parallel Programming}
+\subsection{Designing Parallel Algorithms}
+When designing parallel algorithms, we can take one of two approaches:
+\begin{itemize}
+    \item \textbf{Option 1}:
+          \begin{itemize}
+              \item Start with a sequential implementation
+              \item Largely preserve the structure of the sequential
+                    implementation
+              \item Incrementally introduce parallelism to parts of the
+                    code
+          \end{itemize}
+    \item \textbf{Option 2}:
+          \begin{itemize}
+              \item Analyse the high level parallel structure of the
+                    algorithm
+              \item Develop and test a skeleton of the parallel
+                    structure first
+              \item Use high-level parallel abstractions such as the
+                    consumer-producer pattern
+              \item Plug in the pre-tested sequential components into
+                    the parallel skeleton
+          \end{itemize}
+\end{itemize}
+The advantages of the second option is that we can test and debug the
+sequential components of the algorithm separately from the parallel
+structure.
+\subsection{Analysing Parallel Algorithms}
+We define \textbf{work} \(T_1\) as the time taken to execute a program
+on a single processor, and \textbf{span} \(T_\infty\) as the time taken
+to execute a program on an infinite number of processors. If we draw
+our algorithm as a directed acyclic graph, the work is the sum of the
+weights of all nodes in the graph, and the span is the length of the
+longest path from the start node to the end node, also known as the
+\textbf{critical path}. We can also define the variable \(T_p\) as the
+time taken to execute a program on \(p\) processors.
+
+Using these variables we can define the following relationships:
+\begin{itemize}
+    \item Span law: \(T_p \geqslant T_\infty\)
+    \item Work law: \(T_p \geqslant T_1 / p\)
+    \item Speedup: \(T_1 / T_p \leqslant p\)
+    \item Parallelism: \(T_1 / T_\infty\)
+\end{itemize}
+\subsection{Parallel Design Patterns}
+\subsubsection{Divide and Conquer}
+\begin{enumerate}
+    \item Divide the problem into two or more subproblems
+    \item Solve each subproblem recursively in parallel
+    \item Combine the results of the subproblems to solve the original
+          problem
+\end{enumerate}
+An example of this pattern is the quicksort algorithm, which has the
+following pseudocode:
+\begin{minted}{text}
+// sort array A
+
+partition A at position p
+    such that A[i] <= A[j] for all i < p and j >= p
+
+parallel quicksort(A[0:p])
+parallel quicksort(A[p+1:n])
+
+// A is now sorted
+\end{minted}
+On average, if we assume the sequential paritioning of the array takes
+\(\mathcal{O}\left( n \right)\) time, the work of the algorithm for a
+problem of size \(n\) is given by:
+\begin{equation*}
+    T_1\left( n \right) = 2T_1\left( \frac{n}{2} \right) + \mathcal{O}\left( n \right) \implies T_1\left( n \right) = \mathcal{O}\left( n \log n \right)
+\end{equation*}
+The span of the algorithm is given by:
+\begin{equation*}
+    T_\infty\left( n \right) = T_\infty\left( \frac{n}{2} \right) + \mathcal{O}\left( n \right) \implies T_\infty\left( n \right) = \mathcal{O}\left( n \right)
+\end{equation*}
+Therefore, the parallelism efficiency of the algorithm is given by:
+\begin{equation*}
+    T_1 / T_\infty = \mathcal{O}\left( \log n \right)
+\end{equation*}
+\subsubsection{Contraction}
+\begin{enumerate}
+    \item Reduce the problem into a smaller problem (reduction)
+    \item Solve the smaller problem (often recursively)
+    \item Use the results of the subproblems to solve the original
+          problem (expansion)
+\end{enumerate}
+An example of this pattern is the parallel prefix sum algorithm, which
+has the following pseudocode:
+\begin{minted}{text}
+// compute the prefix sum of array A
+
+parallel for i = 1 to n/2
+    B[i] = B[2 * i] + A[2 * i + 1]
+
+R = prefix_sum(B)
+
+parallel for i = 1 to n/2
+    sum[2 * i] = R[i] - A[2 * i + 1]
+    sum[2 * i + 1] = R[i]
+
+// sum is now the prefix sum of A
+\end{minted}
+The work of the algorithm for a problem of size \(n\) is given by:
+\begin{equation*}
+    T_1\left( n \right) = T_1\left( \frac{n}{2} \right) + \mathcal{O}\left( n \right) \implies T_1\left( n \right) = \mathcal{O}\left( n \right)
+\end{equation*}
+The span of the algorithm is given by:
+\begin{equation*}
+    T_\infty\left( n \right) = T_\infty\left( \frac{n}{2} \right) + \mathcal{O}\left( 1 \right) \implies T_\infty\left( n \right) = \mathcal{O}\left( \log n \right)
+\end{equation*}
+Therefore, the parallelism efficiency of the algorithm is given by:
+\begin{equation*}
+    T_1 / T_\infty = \mathcal{O}\left( n / \log n \right)
+\end{equation*}
+\subsubsection{Partitioning}
+\begin{enumerate}
+    \item Partition the input data into \(k\) disjoint subsets
+    \item Solve each subset independently using a different algorithm
+    \item Combine the results of the subsets to solve the original
+          problem
+\end{enumerate}
+An example of this pattern is computing the sum of an array.
+\begin{minted}{text}
+// compute the sum of array A
+
+parallel for p = 0 to k
+    partial_sum[p] = 0
+
+    for i = p * n / k to min(n, (p + 1) * n / k - 1)
+        partial_sum[p] += A[i]
+
+for p = 0 to k
+    sum += partial_sum[p]
+
+// sum is now the sum of A
+\end{minted}
+The work of the algorithm for a problem of size \(n\) is given by:
+\begin{equation*}
+    T_1\left( n \right) = n + k
+\end{equation*}
+The span of the algorithm is given by:
+\begin{equation*}
+    T_\infty\left( n \right) = n/k + k
+\end{equation*}
+Therefore, the parallelism efficiency of the algorithm is given by:
+\begin{equation*}
+    T_1 / T_\infty = k
+\end{equation*}
+\subsubsection{Pointer Jumping}
+\begin{enumerate}
+    \item Each node is replaced by its parent in a tree recursively
+\end{enumerate}
+This pattern is used in very specific cases, such as when finding the
+root of a forest of trees.
+\begin{minted}{text}
+for i = 0 to log(n)
+    parallel foreach node p in tree
+        if p.parent.parent != NULL
+            p.parent = p.parent.parent
+\end{minted}
+The work of the algorithm for a problem of size \(n\) is given by:
+\begin{equation*}
+    T_1\left( n \right) = \mathcal{O}\left( n \log n \right)
+\end{equation*}
+The span of the algorithm is given by:
+\begin{equation*}
+    T_\infty\left( n \right) = \mathcal{O}\left( \log n \right)
+\end{equation*}
+Therefore, the parallelism efficiency of the algorithm is given by:
+\begin{equation*}
+    T_1 / T_\infty = \mathcal{O}\left( n \right)
+\end{equation*}
+\subsection{Search Algorithms}
+Combinatorial search problems are a class of problems that involve
+searching through a large number of possible solutions to find one or
+more optimal (or suboptimal) solutions, defined in a problem space.
+These problems can be classified into two categories:
+\begin{itemize}
+    \item \textbf{Decision Problems}: These problems involve finding a
+          solution that satisfies a set of constraints. The answer to a
+          decision problem is either ``yes'' or ``no''. For example, the
+          travelling salesman problem involves finding the shortest path
+          that visits a set of cities exactly once.
+    \item \textbf{Optimisation Problems}: These problems involve finding
+          the best solution that maximises or minimises an objective
+          function. The answer to an optimisation problem is a value
+          that represents the quality of the solution. For example,
+          the knapsack problem involves finding the combination of
+          items that maximises the total value while staying within a
+          weight limit.
+\end{itemize}
+\subsubsection{Search Trees}
+We can often depict search algorithms as a tree, where each node
+represents a state in the search space, and each edge represents a
+decision that leads to a new state. At each node, we can perform the
+following checks:
+\begin{itemize}
+    \item Have we been in this state before?
+          \begin{itemize}
+              \item try to avoid potential cycles
+          \end{itemize}
+    \item Is this state a solution to the problem?
+          \begin{itemize}
+              \item is the solution valid and better than the current
+                    best solution?
+          \end{itemize}
+    \item If not, determine the next states to explore recursively
+\end{itemize}
+\subsubsection{Exploring the Search Space}
+We can use several techniques to explore the search space:
+\begin{itemize}
+    \item \textbf{Backtracking}: This is a depth-first search algorithm
+          that explores the search space by recursively exploring all
+          possible solutions. After searching all options at a node, it
+          backtracks to the previous branching point and explores the
+          next option.
+    \item \textbf{Recursive Depth-First Search}: This is a depth-first
+          search algorithm that explores the search space by recursively
+          exploring all possible solutions. It is similar to backtracking,
+          but does not backtrack to the previous branching point after
+          exploring all options at a node, as they have already been
+          explored. It is therefore one possible implementation of
+          the backtracking algorithm.
+\end{itemize}
+\subsubsection{Exploring the Search Space in Parallel}
+When exploring the search space in parallel, we must ensure that each
+thread explores a disjoint subset of the search space and that threads
+are load balanced. This can be achieved by using the following
+steps:
+\begin{itemize}
+    \item Explore the first few levels of the search space sequentially.
+    \item Assign a subset of the search space to each thread. Here we
+          should consider over-decomposing the search space to ensure
+          that all threads are kept busy.
+    \item Use shared memory to inform threads of the best solution found
+          so far. If the best solution has been found, all threads
+          should terminate.
+\end{itemize}
+An alternative approach to depth-first search is to use a breadth-first
+search algorithm, which explores the search space level by level.
+\subsubsection{Pruning the Search Space}
+When exploring the search space, we can use pruning techniques to
+eliminate parts of the search space that are not worth exploring. If we
+already have a solution with quality \(q\), and the best case quality of
+the current partial solution is \(p\), where \(p < q\), we do not need
+to explore the current partial solution further, as it will not lead to
+a better solution. Thus, we can prune the subtree beneath the current
+partial solution with quality \(p\). Note that pruning is only possible
+is we can guarantee that the quality of the current partial solution
+will be worse than the best solution found so far. Pruning should not
+eliminate any potential solutions.
+
+To be able to apply pruning, we need to determine the best solution
+early in the search process, so that we can apply pruning as soon as
+possible, that is, a solution with large quality. Therefore we want to
+use a heuristic that lets us explore the most promising parts of the
+search space first. This is known as \textbf{branch and bound}, where
+we prioritise the most promising parts of the search space to explore
+first in parallel. We do this by using a priority queue to store the
+partial solutions, where the priority is determined by the quality of
+the solution. We explore any low quality solutions after these high
+quality solutions, as we do not yet know if they are all worse than the
+best solution found so far.
+
+On a distributed system, it is not worth using a shared global priority
+queue that is accessed by all systems, as this would lead to a
+bottleneck. Instead, it is m can use a local priority queue on each system, and only
+communicate the best solution found so far to all systems. Each machine
+can apply periodic \textbf{work stealing} to ensure all systems are kept
+busy at all times and to find the best solution as quickly as possible,
+by sharing the best solution found so far with other systems.
+\begin{aside}
+    \textbf{Minimax} is a strategy in decision-making and game theory
+    that finds the optimal move by minimising the possible loss. In a
+    two-player game, Player A (the maximiser) aims to achieve the best
+    score while Player B (the minimiser) tries to reduce it. The minimax
+    algorithm explores the game tree by alternating between moves that
+    either maximize or minimise the score, depending on the player.
+
+    \textbf{Alpha-Beta Pruning} optimises minimax by skipping branches
+    that won't affect the final decision, which speeds up the search.
+    This pruning uses two values:
+    \begin{itemize}
+        \item \textbf{Alpha}: the minimum score the maximiser (Player A) can guarantee.
+        \item \textbf{Beta}: the maximum score the minimiser (Player B) can secure.
+    \end{itemize}
+    If a move's potential outcome is worse than the current best, it
+    stops further exploration of that branch. This strategy mirrors the
+    principle of branch and bound, discarding paths that can't improve
+    the solution, and allows a larger search space to be covered
+    efficiently.
+
+    For the minimax algorithm to work effectively, the game tree must be
+    sufficiently deep to allow for a meaningful exploration of the
+    search space. In addition to this, the evaluation function used to
+    determine the quality of a solution must be accurate and efficient.
+    These algorithms are commonly used in games such as chess, where
+    programs often outperform human players due to their ability to
+    select the best move from a large number of possibilities.
+\end{aside}
+
 \end{document}
