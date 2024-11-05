@@ -785,7 +785,7 @@ thread pools internally.
 \subsubsection{Load Balancing} When mapping work to processors, it is important to balance the work
 done by each processor. This can be done using
 \begin{itemize}
-    \item \textbf{Dynamic work allocation}: where work is overdecomposed
+    \item \textbf{Dynamic work allocation}: where work is over-decomposed
           into many work units, typically far more than the number of
           processors. This is good if execution times are unpredictable
           or if the work is not evenly distributed, but can have
@@ -1156,16 +1156,38 @@ simultaneously:
           thread 1, thread 1 is waiting for a lock held by thread 2, and
           thread 2 is waiting for a lock held by thread 0.
 \end{itemize}
-It is important to be mindful of deadlocks when working with more than
-one lock, as they prevent the program from progressing. Note that it may
-be possible to prevent deadlocks by ensuring that all locks are available
-before a thread enters the critical section, however, this requires
-cooperation between threads and may not always be possible. Therefore,
-locks are said to be \textbf{non-composable} as they break abstraction
-by exposing the internal state of the program, preventing software
-components from being developed independently.
+When working with more than one lock in a multi-threaded program, it is
+crucial to be mindful of deadlocks, as they prevent the program from
+progressing. A common approach to avoiding deadlocks is to ensure that
+all required locks are available before any thread enters the critical
+section. However, this strategy requires coordination between threads,
+which can be complex and may not always be feasible.
+
+Locks are said to violate the principles of \textbf{abstraction} and
+\textbf{composability} because they require knowledge of the internal
+state of other threads to function correctly.
+\begin{itemize}
+    \item \textbf{Abstraction}: Locks expose low-level details about how
+          resources are managed in a program, which breaks the goal of
+          abstraction in software design. Rather than being able to
+          focus on the high-level logic of a thread, programmers must be
+          aware of how and when locks are acquired and released, as well
+          as the risk of deadlocks and race conditions. This complexity
+          forces programmers to deal with concurrency control directly,
+          rather than having it hidden behind an abstraction.
+    \item \textbf{Composability}: Locks also violate composability
+          because they make it difficult to develop and combine
+          independent software components safely. When multiple locks
+          are involved, deadlock potential arises if locks are acquired
+          in inconsistent orders across threads. This interdependence
+          means that components cannot be safely reused or composed
+          without \linebreak coordination, as their behaviour depends on how other
+          threads manage locks. Consequently, locks limit the ability to
+          combine components independently, leading to complex inter-thread
+          dependencies.
+\end{itemize}
 \subsubsection{Livelocks and Starvation}
-\textbf{Livelocks} are similar situtations to deadlocks, where instead
+\textbf{Livelocks} are similar situations to deadlocks, where instead
 of being completely blocked, threads are able to perform work, but
 unable to make progress. \textbf{Starvation} is a situation where a
 thread is unable to enter the critical section because it is never
@@ -1555,7 +1577,7 @@ following:
           \begin{itemize}
               \item use dynamic work allocation to balance the work
                     across cores
-              \item overdecompose the work into many work units by
+              \item over-decompose the work into many work units by
                     creating more threads than cores to ensure that all
                     cores are kept busy
           \end{itemize}
@@ -1842,7 +1864,7 @@ heuristics:
           that all warps within that block use all cores within on that
           multiprocessor.
     \item the number of blocks in a grid should be larger than the
-          number of multiprcessors so that all multiprocessors are kept
+          number of multiprocessors so that all multiprocessors are kept
           busy.
 \end{itemize}
 \section{Parallel Programming}
@@ -1910,7 +1932,7 @@ parallel quicksort(A[p+1:n])
 
 // A is now sorted
 \end{minted}
-On average, if we assume the sequential paritioning of the array takes
+On average, if we assume the sequential partitioning of the array takes
 \(\mathcal{O}\left( n \right)\) time, the work of the algorithm for a
 problem of size \(n\) is given by:
 \begin{equation*}
