@@ -2072,30 +2072,30 @@ We can use several techniques to explore the search space:
 \subsubsection{Exploring the Search Space in Parallel}
 When exploring the search space in parallel, we must ensure that each
 thread explores a disjoint subset of the search space and that threads
-are load balanced. This can be achieved by using the following
-steps:
+are load balanced. This can be achieved by using the following steps:
 \begin{itemize}
-    \item Explore the first few levels of the search space sequentially.
+    \item Explore the first few levels of the search space
+          sequentially.
     \item Assign a subset of the search space to each thread. Here we
           should consider over-decomposing the search space to ensure
           that all threads are kept busy.
-    \item Use shared memory to inform threads of the best solution found
-          so far. If the best solution has been found, all threads
-          should terminate.
+    \item Use shared memory to inform threads of the best solution
+          found so far. If the best solution has been found, all
+          threads should terminate.
 \end{itemize}
 An alternative approach to depth-first search is to use a breadth-first
 search algorithm, which explores the search space level by level.
 \subsubsection{Pruning the Search Space}
 When exploring the search space, we can use pruning techniques to
 eliminate parts of the search space that are not worth exploring. If we
-already have a solution with quality \(q\), and the best case quality of
-the current partial solution is \(p\), where \(p < q\), we do not need
-to explore the current partial solution further, as it will not lead to
-a better solution. Thus, we can prune the subtree beneath the current
-partial solution with quality \(p\). Note that pruning is only possible
-is we can guarantee that the quality of the current partial solution
-will be worse than the best solution found so far. Pruning should not
-eliminate any potential solutions.
+already have a solution with quality \(q\), and the best case quality
+of the current partial solution is \(p\), where \(p < q\), we do not
+need to explore the current partial solution further, as it will not
+lead to a better solution. Thus, we can prune the subtree beneath the
+current partial solution with quality \(p\). Note that pruning is only
+possible is we can guarantee that the quality of the current partial
+solution will be worse than the best solution found so far. Pruning
+should not eliminate any potential solutions.
 
 To be able to apply pruning, we need to determine the best solution
 early in the search process, so that we can apply pruning as soon as
@@ -2111,11 +2111,12 @@ best solution found so far.
 
 On a distributed system, it is not worth using a shared global priority
 queue that is accessed by all systems, as this would lead to a
-bottleneck. Instead, it is m can use a local priority queue on each system, and only
-communicate the best solution found so far to all systems. Each machine
-can apply periodic \textbf{work stealing} to ensure all systems are kept
-busy at all times and to find the best solution as quickly as possible,
-by sharing the best solution found so far with other systems.
+bottleneck. Instead, it is m can use a local priority queue on each
+system, and only communicate the best solution found so far to all
+systems. Each machine can apply periodic \textbf{work stealing} to
+ensure all systems are kept busy at all times and to find the best
+solution as quickly as possible, by sharing the best solution found so
+far with other systems.
 \begin{aside}
     \textbf{Minimax} is a strategy in decision-making and game theory
     that finds the optimal move by minimising the possible loss. In a
@@ -2137,13 +2138,187 @@ by sharing the best solution found so far with other systems.
     the solution, and allows a larger search space to be covered
     efficiently.
 
-    For the minimax algorithm to work effectively, the game tree must be
-    sufficiently deep to allow for a meaningful exploration of the
+    For the minimax algorithm to work effectively, the game tree must
+    be sufficiently deep to allow for a meaningful exploration of the
     search space. In addition to this, the evaluation function used to
     determine the quality of a solution must be accurate and efficient.
     These algorithms are commonly used in games such as chess, where
     programs often outperform human players due to their ability to
     select the best move from a large number of possibilities.
 \end{aside}
+\section{Big Data}
+\subsection{Introduction}
+\textbf{Big data} refers to data sets that are beyond the ability of
+commonly used software tools to capture and process within a tolerable
+time frame. Big data is characterised by the \textbf{3Vs}:
+\begin{itemize}
+    \item \textbf{Volume}: The amount of data
+    \item \textbf{Velocity}: The speed at which data is generated and
+          processed
+    \item \textbf{Variety}: The different types of data sources and
+          formats
+\end{itemize}
+To process big data, we need specialised tools and techniques that can
+handle the volume, velocity, and variety of the data. These tools
+include distributed computing frameworks like MapReduce, Apache Hadoop,
+and Apache Spark, which allow us to process large data sets across
+multiple machines in parallel. These frameworks provide the scalability
+and fault tolerance needed to process big data efficiently.
+\begin{aside}
+    The rapid pace of data generation and collection has transformed
+    scientific research, giving rise to what is known as
+    \textbf{data-driven science}. In this approach, new discoveries are
+    made by analysing vast datasets, uncovering patterns and insights
+    that were previously inaccessible. This shift has also popularised
+    the term \textbf{data science}, which encompasses methods in data
+    analysis and machine learning to extract knowledge from data.
+    This era of data-driven science is often referred to as the
+    \textbf{fourth paradigm of science}, following the traditional
+    paradigms of empirical, theoretical, and computational science.
+\end{aside}
+\subsection{Map and Reduce}
+The map and reduce operations are inspired by the \textbf{map} and
+\textbf{reduce} functions in functional programming languages, which
+are used to transform and aggregate data. A \textbf{map} operation
+applies a pure function to each element in a data set, producing a new
+set of output elements.
+\begin{minted}{c}
+for (int i = 0; i < n; i++)
+{
+    output[i] = f(input[i]);
+}
 
+output = map(f, input);
+\end{minted}
+A \textbf{reduce} operation combines the output elements from the map
+operation to produce a single result.
+\begin{minted}{c}
+output = input[0];
+
+for (int i = 1; i < n; i++)
+{
+    output = g(output, input[i]);
+}
+
+output = reduce(g, input);
+\end{minted}
+\subsubsection{MapReduce}
+MapReduce is a programming model and framework for processing large
+data sets in parallel across a distributed cluster of computers. It
+consists of two main phases:
+\begin{itemize}
+    \item \textbf{Map Phase}: The input data is divided into smaller
+          chunks, and a map function is applied to each chunk to produce
+          a set of intermediate key-value pairs.
+    \item \textbf{Reduce Phase}: The intermediate key-value pairs are
+          grouped by key, and a reduce function is applied to each group
+          to produce the final output.
+\end{itemize}
+\subsubsection{Apache Hadoop}
+Apache Hadoop is an open-source framework for distributed storage and
+processing of large data sets using the MapReduce programming model.
+Hadoop consists of the following components:
+\begin{itemize}
+    \item \textbf{Hadoop Distributed File System (HDFS)}: A distributed
+          file system that stores data across multiple machines in a
+          fault-tolerant manner. The HDFS keeps track of the location of
+          each data block and replicates blocks across multiple
+          machines to ensure data durability.
+    \item \textbf{Hadoop MapReduce}: A distributed data processing
+          framework that allows users to write and run MapReduce jobs
+          on large data sets.
+    \item \textbf{Hadoop YARN (Yet Another Resource Negotiator)}: A
+          resource management and job scheduling system that allows
+          multiple data processing engines to run on the same Hadoop
+          cluster.
+    \item \textbf{Workers}: The machines in the Hadoop cluster that
+          store data on disk and run MapReduce jobs.
+\end{itemize}
+Hadoop works by dividing a large data set into smaller chunks, which
+are distributed across all machines in the cluster. The location and
+distribution of this data is managed by the HDFS. When a client program
+requests to run a MapReduce job, it uses YARN to allocate resources for
+the job. YARN then schedules both map and reduce jobs to run on each
+machine in the cluster, where the map and reduce functions are executed
+in parallel.
+To efficiently process data across each worker, the YARN scheduler must
+communicate with the HDFS to ensure that data is stored locally on the
+worker where the job is running.
+
+Newer frameworks like Apache Spark have been developed to address some
+of the limitations of Hadoop, by using an in-memory processing model
+rather than writing intermediate results to disk.
+\subsection{Locality and Fault Tolerance}
+To ensure that data is processed efficiently and reliably in a
+distributed system, frameworks like Hadoop use the principles of
+\textbf{locality} and \textbf{fault tolerance}.
+\begin{itemize}
+    \item \textbf{Locality}: Locality refers to the principle of
+          processing data on the same machine where it is stored. By
+          processing data locally, we can avoid the overhead of
+          transferring data over the network, and execute computations
+          in parallel.
+    \item \textbf{Fault Tolerance}: Fault tolerance refers to the
+          ability of a system to continue operating in the presence of
+          hardware or software failures. In a distributed system like
+          Hadoop, fault tolerance is achieved by replicating data
+          across multiple machines and rerunning failed tasks on
+          different machines. This is essential on systems with a
+          large number of machines, where the probability of failure
+          may be significant.
+\end{itemize}
+\section{Cloud Computing}
+Cloud computing is a model for delivering computing services over the
+internet, where resources are provided on-demand and scaled according
+to the needs of the user. In a traditional web-based application, a
+client uses a web browser to connect to a web server via the internet.
+This web server is responsible for processing requests (i.e., HTTP
+requests) and returning responses to the client. This server is
+typically hosted on-premises, on a physical machine, that also holds
+the database and server-side application code. Here, all infrastructure
+on the server machine is managed by the user, including the operating
+system, web server, and database server. Additionally, the user is
+responsible for scaling the server to meet the demands of the
+application and must be able to predict the amount of resources
+required to handle the expected load.
+
+In a cloud-based model, cloud providers such as Amazon Web Services
+(AWS), Google Cloud Platform (GCP), and Microsoft Azure offer
+infrastructure services over the internet. These services offload some
+of the responsibilities of managing infrastructure from the user to the
+cloud provider. These services can be broadly categorised into three
+types depending on what is being provided and what is managed by the
+user:
+\begin{table}[H]
+    \centering
+    \begin{tabular}{l|cccc}
+        \toprule
+        \textbf{Service Type} & \textbf{On-Premises} & \textbf{IaaS} & \textbf{PaaS} & \textbf{SaaS} \\
+        \midrule
+        Applications          & Yes                  & Yes           & Yes           & No            \\
+        Data                  & Yes                  & Yes           & Yes           & No            \\
+        Runtime               & Yes                  & Yes           & No            & No            \\
+        Middleware            & Yes                  & Yes           & No            & No            \\
+        O/S                   & Yes                  & Yes           & No            & No            \\
+        Virtualisation        & Yes                  & No            & No            & No            \\
+        Servers               & Yes                  & No            & No            & No            \\
+        Storage               & Yes                  & No            & No            & No            \\
+        Networking            & Yes                  & No            & No            & No            \\
+        \bottomrule
+    \end{tabular}
+    \caption{List of services managed by a cloud service provider for each service type.
+        IaaS: Infrastructure as a Service, PaaS: Platform as a Service, SaaS: Software as a Service.}
+\end{table}
+\subsection{Machine Learning}
+One recent application of cloud computing is in machine learning, which
+is a field of artificial intelligence that focuses on developing
+algorithms that can learn from and make predictions based on some
+training data. In particular, deep learning models have become
+increasingly popular for their ability to learn complex patterns in
+data, such as images, text, and audio. These models are typically
+trained on large data sets using powerful hardware like GPUs and TPUs
+(Tensor Processing Units). These hardware accelerators are crucial in
+the training phase when models need to learn the weights of the
+connections between neurons by performing a large number of matrix
+products during forward and backward propagation.
 \end{document}
